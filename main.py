@@ -3,12 +3,14 @@ from bs4 import BeautifulSoup
 import json
 import os
 import re
+from datetime import datetime
 
 # --- Configuration ---
 CRAWFORD_URL = "https://inmates.crawfordcountysheriff.org/"
 SEBASTIAN_URL = "https://inmate.sebastiancountyar.gov/NewWorld.InmateInquiry/AR0660000"
 DATABASE_FILE = "database.json"
-NEWLY_ADDED_FILE = "newly_added.json"
+CURRENT_INMATES_FILE = "current_inmates.json"
+METADATA_FILE = "metadata.json"
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64 ) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 }
@@ -42,7 +44,6 @@ def scrape_crawford_county():
                 details_link = name_tag.find('a')['href']
                 details_url = f"https://inmates.crawfordcountysheriff.org{details_link}"
 
-                # Visit details page to get image
                 try:
                     details_response = requests.get(details_url, headers=HEADERS )
                     details_soup = BeautifulSoup(details_response.content, 'html.parser')
@@ -58,7 +59,7 @@ def scrape_crawford_county():
                     })
                 except requests.RequestException as e:
                     print(f"  - Could not fetch details for {name}: {e}")
-                    continue # Skip this inmate if details page fails
+                    continue
         print(f"  - Found {len(inmates)} inmates.")
     except requests.RequestException as e:
         print(f"  - Error scraping Crawford County: {e}")
@@ -93,51 +94,63 @@ def scrape_sebastian_county():
         print(f"  - Error scraping Sebastian County: {e}")
     return inmates
 
-# --- Database Functions ---
+# --- Database & File Functions ---
 
 def load_database():
-    """Loads the master inmate database from the JSON file."""
     if not os.path.exists(DATABASE_FILE):
         return {}
-    with open(DATABASE_FILE, 'r') as f:
-        return json.load(f)
+    try:
+        with open(DATABASE_FILE, 'r') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return {}
 
 def save_database(db):
-    """Saves the master inmate database to the JSON file."""
     with open(DATABASE_FILE, 'w') as f:
         json.dump(db, f, indent=4)
 
-def save_newly_added(inmates):
-    """Saves the list of newly added inmates to a JSON file for the website."""
-    with open(NEWLY_ADDED_FILE, 'w') as f:
+def save_current_inmates(inmates):
+    with open(CURRENT_INMATES_FILE, 'w') as f:
         json.dump(inmates, f, indent=4)
+
+def save_metadata():
+    now = datetime.utcnow()
+    timestamp = now.strftime("%B %d, %Y at %I:%M %p UTC")
+    metadata = {"lastUpdatedAt": timestamp}
+    with open(METADATA_FILE, 'w') as f:
+        json.dump(metadata, f, indent=4)
 
 # --- Main Execution ---
 
 if __name__ == "__main__":
     print("Starting inmate scraper...")
     
-    # Load existing database
     master_db = load_database()
     print(f"Loaded {len(master_db)} records from the master database.")
     
-    # Scrape live data
     scraped_inmates = scrape_crawford_county() + scrape_sebastian_county()
     print(f"Total inmates scraped: {len(scraped_inmates)}")
     
-    # Identify new inmates
-    newly_added = []
+    current_inmates_with_status = []
     for inmate in scraped_inmates:
-        if inmate['inmateId'] not in master_db:
-            newly_added.append(inmate)
-            master_db[inmate['inmateId']] = inmate # Add to master DB
+        is_new = inmate['inmateId'] not in master_db
+        inmate_data = {
+            'inmateId': inmate['inmateId'],
+            'name': inmate['name'],
+            'imageUrl': inmate['imageUrl'],
+            'county': inmate['county'],
+            'isNew': is_new
+        }
+        current_inmates_with_status.append(inmate_data)
+        
+        if is_new:
+            master_db[inmate['inmateId']] = inmate # Add new inmate to master DB
             print(f"  - New inmate found: {inmate['name']} ({inmate['county']})")
             
-    print(f"Found {len(newly_added)} new inmates.")
+    print(f"Processed {len(current_inmates_with_status)} total inmates.")
     
-    # Save the results
-    save_newly_added(newly_added)
+    save_current_inmates(current_inmates_with_status)
     save_database(master_db)
+    save_metadata()
     
-    print("Script finished. Results saved.")
-
+    print("Script finished. All files saved.")
