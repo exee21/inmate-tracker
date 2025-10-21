@@ -33,7 +33,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add database.json newly_added.json
+          git add database.json current_inmates.json metadata.json
           if git diff-index --quiet HEAD; then
             echo "No changes to commit."
           else
