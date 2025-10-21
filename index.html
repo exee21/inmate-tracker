@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newly Added Inmates</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            color: #1c1e21;
+            margin: 0;
+            padding: 20px;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        h1 {
+            color: #333;
+        }
+        #inmate-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .inmate-card {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px;
+            text-align: center;
+        }
+        .inmate-card img.mugshot {
+            width: 150px;
+            height: 180px;
+            object-fit: cover;
+            border-radius: 4px;
+            background-color: #eee;
+            border: 1px solid #ddd;
+        }
+        .inmate-card .name {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin: 15px 0 10px;
+        }
+        .inmate-card .county-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .inmate-card .county-icon {
+            width: 40px;
+            height: 40px;
+        }
+        #message {
+            text-align: center;
+            font-size: 1.2em;
+            color: #606770;
+            margin-top: 50px;
+        }
+        /* Shield Icons (Base64 encoded to be self-contained) */
+        .icon-crawford {
+            background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzAzOWJlMyI+PHBhdGggZD0iTTEyIDFDMyAxIDEgMyAxIDEydjljMCAxLjEgLjkgMiAyIDJoMThjMS4xIDAgMi0uOSAyLTJ2LTlDDIzIDMgMjEgMSAxMiAxem0wIDJjMS4xIDAgMiAuOSAyIDIgMCAxLjEtLjkgMi0yIDItMS4xIDAtMi0uOS0yLTJzLjktMiAyLTJ6bTAgMTZIOFYxMWgxMHY2eiIvPjwvc3ZnPg==');
+        }
+        .icon-sebastian {
+            background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzc4NTdhOCI+PHBhdGggZD0iTTEyIDFDMyAxIDEgMyAxIDEydjljMCAxLjEgLjkgMiAyIDJoMThjMS4xIDAgMi0uOSAyLTJ2LTlDDIzIDMgMjEgMSAxMiAxem02IDE2aC00di02aDR2NnptLTYgMEg4di02aDR2NnptOC04SDZWN2gxMnYyeiIvPjwvc3ZnPg==');
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Newly Added Inmates</h1>
+    </header>
+
+    <main id="inmate-container"></main>
+    <div id="message"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.getElementById('inmate-container');
+            const messageDiv = document.getElementById('message');
+
+            // Fetch data from the JSON file
+            fetch('newly_added.json')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok ' + response.statusText);
+                    }
+                    // Handle empty file by returning an empty array
+                    return response.text().then(text => text ? JSON.parse(text) : []);
+                })
+                .then(inmates => {
+                    if (inmates.length === 0) {
+                        messageDiv.textContent = 'No new inmates found since the last update.';
+                        return;
+                    }
+
+                    inmates.forEach(inmate => {
+                        const card = document.createElement('div');
+                        card.className = 'inmate-card';
+
+                        const countyIconClass = inmate.county === 'crawford' ? 'icon-crawford' : 'icon-sebastian';
+                        
+                        card.innerHTML = `
+                            <img src="${inmate.imageUrl}" alt="Mugshot of ${inmate.name}" class="mugshot" onerror="this.style.display='none'">
+                            <div class="name">${inmate.name}</div>
+                            <div class="county-info">
+                                <div class="county-icon ${countyIconClass}"></div>
+                            </div>
+                        `;
+                        container.appendChild(card);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching or parsing inmate data:', error);
+                    messageDiv.textContent = 'Could not load inmate data. The newly_added.json file may be missing or improperly formatted.';
+                });
+        });
+    </script>
+
+</body>
+</html>
