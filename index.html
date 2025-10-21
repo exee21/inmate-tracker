@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Newly Added Inmates</title>
+    <title>Inmate Roster</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -15,27 +15,60 @@
         header {
             text-align: center;
             margin-bottom: 30px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 20px;
         }
         h1 {
             color: #333;
+            margin: 0;
         }
-        #inmate-container {
+        #last-updated {
+            color: #606770;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        .main-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        .column {
+            flex: 1;
+            min-width: 320px;
+        }
+        .column h2 {
+            text-align: center;
+            color: #333;
+            border-bottom: 2px solid #ccc;
+            padding-bottom: 10px;
+        }
+        .inmate-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
             gap: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
         }
         .inmate-card {
             background-color: #fff;
+            border: 1px solid #ddd;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
             overflow: hidden;
             display: flex;
             flex-direction: column;
             align-items: center;
             padding: 15px;
             text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .inmate-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .inmate-card.is-new {
+            border-left: 5px solid #007bff;
+            background-color: #f0f8ff;
         }
         .inmate-card img.mugshot {
             width: 150px;
@@ -43,7 +76,6 @@
             object-fit: cover;
             border-radius: 4px;
             background-color: #eee;
-            border: 1px solid #ddd;
         }
         .inmate-card .name {
             font-size: 1.1em;
@@ -58,14 +90,20 @@
         .inmate-card .county-icon {
             width: 40px;
             height: 40px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
         }
-        #message {
+        .message {
             text-align: center;
-            font-size: 1.2em;
+            font-size: 1.1em;
             color: #606770;
-            margin-top: 50px;
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
         }
-        /* Shield Icons (Base64 encoded to be self-contained) */
+        /* Icons */
         .icon-crawford {
             background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzAzOWJlMyI+PHBhdGggZD0iTTEyIDFDMyAxIDEgMyAxIDEydjljMCAxLjEgLjkgMiAyIDJoMThjMS4xIDAgMi0uOSAyLTJ2LTlDDIzIDMgMjEgMSAxMiAxem0wIDJjMS4xIDAgMiAuOSAyIDIgMCAxLjEtLjkgMi0yIDItMS4xIDAtMi0uOS0yLTJzLjktMiAyLTJ6bTAgMTZIOFYxMWgxMHY2eiIvPjwvc3ZnPg==');
         }
@@ -77,51 +115,88 @@
 <body>
 
     <header>
-        <h1>Newly Added Inmates</h1>
+        <h1>Inmate Roster</h1>
+        <div id="last-updated">Loading timestamp...</div>
     </header>
 
-    <main id="inmate-container"></main>
-    <div id="message"></div>
+    <div class="main-container">
+        <div class="column" id="full-roster-column">
+            <h2>Current Roster</h2>
+            <div class="inmate-grid" id="full-roster-grid"></div>
+            <div class="message" id="roster-message" style="display: none;"></div>
+        </div>
+        <div class="column" id="newly-added-column">
+            <h2>Newly Added</h2>
+            <div class="inmate-grid" id="newly-added-grid"></div>
+            <div class="message" id="newly-added-message" style="display: none;"></div>
+        </div>
+    </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const container = document.getElementById('inmate-container');
-            const messageDiv = document.getElementById('message');
+            const rosterGrid = document.getElementById('full-roster-grid');
+            const newlyAddedGrid = document.getElementById('newly-added-grid');
+            const rosterMsg = document.getElementById('roster-message');
+            const newlyAddedMsg = document.getElementById('newly-added-message');
+            const timestampDiv = document.getElementById('last-updated');
 
-            // Fetch data from the JSON file
-            fetch('newly_added.json')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok ' + response.statusText);
-                    }
-                    // Handle empty file by returning an empty array
-                    return response.text().then(text => text ? JSON.parse(text) : []);
-                })
+            function createInmateCard(inmate) {
+                const card = document.createElement('div');
+                card.className = 'inmate-card';
+                if (inmate.isNew) {
+                    card.classList.add('is-new');
+                }
+                const countyIconClass = inmate.county === 'crawford' ? 'icon-crawford' : 'icon-sebastian';
+                card.innerHTML = `
+                    <img src="${inmate.imageUrl}" alt="Mugshot of ${inmate.name}" class="mugshot" onerror="this.onerror=null;this.src='about:blank';this.style.border='1px solid #ccc';">
+                    <div class="name">${inmate.name}</div>
+                    <div class="county-info">
+                        <div class="county-icon ${countyIconClass}"></div>
+                    </div>
+                `;
+                return card;
+            }
+
+            // Fetch inmate data
+            fetch('current_inmates.json')
+                .then(response => response.json())
                 .then(inmates => {
                     if (inmates.length === 0) {
-                        messageDiv.textContent = 'No new inmates found since the last update.';
-                        return;
+                        rosterMsg.textContent = 'No inmates found in the current roster.';
+                        rosterMsg.style.display = 'block';
+                    } else {
+                         inmates.forEach(inmate => {
+                            rosterGrid.appendChild(createInmateCard(inmate));
+                        });
                     }
 
-                    inmates.forEach(inmate => {
-                        const card = document.createElement('div');
-                        card.className = 'inmate-card';
-
-                        const countyIconClass = inmate.county === 'crawford' ? 'icon-crawford' : 'icon-sebastian';
-                        
-                        card.innerHTML = `
-                            <img src="${inmate.imageUrl}" alt="Mugshot of ${inmate.name}" class="mugshot" onerror="this.style.display='none'">
-                            <div class="name">${inmate.name}</div>
-                            <div class="county-info">
-                                <div class="county-icon ${countyIconClass}"></div>
-                            </div>
-                        `;
-                        container.appendChild(card);
-                    });
+                    const newInmates = inmates.filter(inmate => inmate.isNew);
+                    if (newInmates.length === 0) {
+                        newlyAddedMsg.textContent = 'No new inmates since the last update.';
+                        newlyAddedMsg.style.display = 'block';
+                    } else {
+                        newInmates.reverse().forEach(inmate => {
+                            newlyAddedGrid.prepend(createInmateCard(inmate));
+                        });
+                    }
                 })
                 .catch(error => {
-                    console.error('Error fetching or parsing inmate data:', error);
-                    messageDiv.textContent = 'Could not load inmate data. The newly_added.json file may be missing or improperly formatted.';
+                    console.error('Error fetching inmate data:', error);
+                    rosterMsg.textContent = 'Could not load inmate roster.';
+                    rosterMsg.style.display = 'block';
+                    newlyAddedMsg.textContent = 'Could not load new inmate data.';
+                    newlyAddedMsg.style.display = 'block';
+                });
+
+            // Fetch metadata
+            fetch('metadata.json')
+                .then(response => response.json())
+                .then(data => {
+                    timestampDiv.textContent = `Last Updated: ${data.lastUpdatedAt}`;
+                })
+                .catch(error => {
+                    console.error('Error fetching metadata:', error);
+                    timestampDiv.textContent = 'Could not load update time.';
                 });
         });
     </script>
