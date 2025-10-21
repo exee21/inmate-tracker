@@ -159,17 +159,23 @@
 
             // Fetch inmate data
             fetch('current_inmates.json')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to load inmate data file.');
+                    return response.json();
+                })
                 .then(inmates => {
+                    // **THIS IS THE FIX**
+                    // Populate the Current Roster (left column)
                     if (inmates.length === 0) {
                         rosterMsg.textContent = 'No inmates found in the current roster.';
                         rosterMsg.style.display = 'block';
                     } else {
-                         inmates.forEach(inmate => {
+                        inmates.forEach(inmate => {
                             rosterGrid.appendChild(createInmateCard(inmate));
                         });
                     }
 
+                    // Populate the Newly Added (right column)
                     const newInmates = inmates.filter(inmate => inmate.isNew);
                     if (newInmates.length === 0) {
                         newlyAddedMsg.textContent = 'No new inmates since the last update.';
@@ -181,7 +187,7 @@
                     }
                 })
                 .catch(error => {
-                    console.error('Error fetching inmate data:', error);
+                    console.error('Error processing inmate data:', error);
                     rosterMsg.textContent = 'Could not load inmate roster.';
                     rosterMsg.style.display = 'block';
                     newlyAddedMsg.textContent = 'Could not load new inmate data.';
@@ -190,7 +196,10 @@
 
             // Fetch metadata
             fetch('metadata.json')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to load metadata file.');
+                    return response.json();
+                })
                 .then(data => {
                     timestampDiv.textContent = `Last Updated: ${data.lastUpdatedAt}`;
                 })
